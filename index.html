@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Productivity Pro | Todo App</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="todo-app">
+        <!-- App Header -->
+        <div class="app-header">
+            <div class="app-title">
+                <i class="fas fa-check-circle"></i>
+                <h1>Productivity Pro</h1>
+            </div>
+            <div class="header-actions">
+                <button class="header-btn" id="theme-toggle">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <button class="header-btn">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Add Task Form -->
+        <div class="add-task-container">
+            <form class="add-task-form" id="task-form">
+                <i class="fas fa-plus input-icon"></i>
+                <input type="text" class="task-input" id="task-input" placeholder="Add a new task..." autocomplete="off">
+                <button type="submit" class="add-btn">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </form>
+        </div>
+        
+        <!-- Task Filters -->
+        <div class="task-filters">
+            <button class="filter-btn active">All</button>
+            <button class="filter-btn">Active</button>
+            <button class="filter-btn">Completed</button>
+            <button class="filter-btn">Priority</button>
+        </div>
+        
+        <!-- Task List -->
+        <div class="task-list" id="task-list">
+            <!-- Tasks will be added here dynamically -->
+        </div>
+        
+        <!-- Habit Tracker -->
+        <div class="habit-section">
+            <h2 class="section-title">
+                <i class="fas fa-sync-alt"></i>
+                <span>Daily Habits</span>
+            </h2>
+            <div class="habit-grid" id="habit-tracker">
+                <div class="habit-day">M</div>
+                <div class="habit-day">T</div>
+                <div class="habit-day">W</div>
+                <div class="habit-day">T</div>
+                <div class="habit-day">F</div>
+                <div class="habit-day">S</div>
+                <div class="habit-day">S</div>
+            </div>
+        </div>
+        
+        <!-- Productivity Stats -->
+        <div class="stats-section">
+            <h2 class="section-title">
+                <i class="fas fa-chart-line"></i>
+                <span>Productivity Stats</span>
+            </h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <i class="fas fa-tasks fa-2x"></i>
+                    <div class="stat-value" id="total-tasks">0</div>
+                    <div class="stat-label">Total Tasks</div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-check-circle fa-2x"></i>
+                    <div class="stat-value" id="completed-tasks">0</div>
+                    <div class="stat-label">Completed</div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-fire fa-2x"></i>
+                    <div class="stat-value" id="streak-days">0</div>
+                    <div class="stat-label">Day Streak</div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-bolt fa-2x"></i>
+                    <div class="stat-value" id="completion-rate">0%</div>
+                    <div class="stat-label">Completion Rate</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
