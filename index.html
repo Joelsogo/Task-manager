@@ -2,97 +2,327 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Productivity Pro | Todo App</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0e17">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Apex">
+    <meta name="description" content="Executive-grade task management and productivity command center">
+    <title>Apex — Executive Command</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230a0e17'/><text y='.9em' x='50%' text-anchor='middle' font-size='70' fill='%23c9a227'>A</text></svg>">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="todo-app">
-        <!-- App Header -->
-        <div class="app-header">
-            <div class="app-title">
-                <i class="fas fa-check-circle"></i>
-                <h1>Productivity Pro</h1>
+    <div id="app" class="app">
+        <div class="status-bar-spacer"></div>
+
+        <header class="app-header" id="app-header">
+            <div class="header-left">
+                <div class="brand">
+                    <span class="brand-mark">A</span>
+                    <span class="brand-name">Apex</span>
+                </div>
             </div>
-            <div class="header-actions">
-                <button class="header-btn" id="theme-toggle">
-                    <i class="fas fa-moon"></i>
-                </button>
-                <button class="header-btn">
-                    <i class="fas fa-cog"></i>
+            <div class="header-right">
+                <div class="notif-wrap">
+                    <button class="icon-btn" id="notif-btn" aria-label="Notifications" aria-expanded="false">
+                        <i class="fas fa-bell"></i>
+                        <span class="badge hidden" id="notif-badge">0</span>
+                    </button>
+                    <div class="notif-panel" id="notif-panel" role="dialog" aria-label="Notifications">
+                        <div class="notif-panel-header">
+                            <h3>Notifications</h3>
+                            <button type="button" class="text-btn" id="notif-clear">Clear all</button>
+                        </div>
+                        <div class="notif-list" id="notif-list"></div>
+                        <div class="notif-empty hidden" id="notif-empty">
+                            <i class="fas fa-bell-slash"></i>
+                            <p>You're all caught up</p>
+                        </div>
+                    </div>
+                </div>
+                <button class="avatar-btn" id="profile-btn" aria-label="Profile">
+                    <span class="avatar-initials">EX</span>
                 </button>
             </div>
-        </div>
-        
-        <!-- Add Task Form -->
-        <div class="add-task-container">
-            <form class="add-task-form" id="task-form">
-                <i class="fas fa-plus input-icon"></i>
-                <input type="text" class="task-input" id="task-input" placeholder="Add a new task..." autocomplete="off">
-                <button type="submit" class="add-btn">
-                    <i class="fas fa-plus"></i>
-                </button>
-            </form>
-        </div>
-        
-        <!-- Task Filters -->
-        <div class="task-filters">
-            <button class="filter-btn active">All</button>
-            <button class="filter-btn">Active</button>
-            <button class="filter-btn">Completed</button>
-            <button class="filter-btn">Priority</button>
-        </div>
-        
-        <!-- Task List -->
-        <div class="task-list" id="task-list">
-            <!-- Tasks will be added here dynamically -->
-        </div>
-        
-        <!-- Habit Tracker -->
-        <div class="habit-section">
-            <h2 class="section-title">
-                <i class="fas fa-sync-alt"></i>
-                <span>Daily Habits</span>
-            </h2>
-            <div class="habit-grid" id="habit-tracker">
-                <div class="habit-day">M</div>
-                <div class="habit-day">T</div>
-                <div class="habit-day">W</div>
-                <div class="habit-day">T</div>
-                <div class="habit-day">F</div>
-                <div class="habit-day">S</div>
-                <div class="habit-day">S</div>
+        </header>
+
+        <aside class="side-nav" id="side-nav" aria-label="Main navigation">
+            <div class="side-brand">
+                <span class="brand-mark">A</span>
+                <span class="brand-name">Apex</span>
             </div>
-        </div>
-        
-        <!-- Productivity Stats -->
-        <div class="stats-section">
-            <h2 class="section-title">
-                <i class="fas fa-chart-line"></i>
-                <span>Productivity Stats</span>
-            </h2>
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <i class="fas fa-tasks fa-2x"></i>
-                    <div class="stat-value" id="total-tasks">0</div>
-                    <div class="stat-label">Total Tasks</div>
+            <nav class="side-nav-items">
+                <button class="side-nav-item active" data-view="dashboard">
+                    <i class="fas fa-th-large"></i>
+                    <span>Dashboard</span>
+                </button>
+                <button class="side-nav-item" data-view="tasks">
+                    <i class="fas fa-list-check"></i>
+                    <span>Tasks</span>
+                </button>
+                <button class="side-nav-item" data-view="habits">
+                    <i class="fas fa-calendar-check"></i>
+                    <span>Habits</span>
+                </button>
+                <button class="side-nav-item" data-view="ai">
+                    <i class="fas fa-sparkles"></i>
+                    <span>Apex AI</span>
+                </button>
+                <button class="side-nav-item" data-view="profile">
+                    <i class="fas fa-user"></i>
+                    <span>Profile</span>
+                </button>
+            </nav>
+            <div class="side-footer">
+                <p class="side-tagline">Executive Command</p>
+            </div>
+        </aside>
+
+        <main class="main-content" id="main-content">
+            <section class="view active" id="view-dashboard">
+                <div class="greeting-block">
+                    <p class="greeting-label" id="greeting-time">Good afternoon</p>
+                    <h1 class="greeting-name">Executive</h1>
+                    <p class="greeting-date" id="current-date"></p>
                 </div>
-                <div class="stat-card">
-                    <i class="fas fa-check-circle fa-2x"></i>
-                    <div class="stat-value" id="completed-tasks">0</div>
-                    <div class="stat-label">Completed</div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-icon focus"><i class="fas fa-bullseye"></i></div>
+                        <div class="kpi-body">
+                            <span class="kpi-value" id="kpi-focus">0</span>
+                            <span class="kpi-label">Focus Tasks</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon done"><i class="fas fa-check-double"></i></div>
+                        <div class="kpi-body">
+                            <span class="kpi-value" id="kpi-done">0</span>
+                            <span class="kpi-label">Completed</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon rate"><i class="fas fa-chart-line"></i></div>
+                        <div class="kpi-body">
+                            <span class="kpi-value" id="kpi-rate">0%</span>
+                            <span class="kpi-label">Hit Rate</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon streak"><i class="fas fa-fire"></i></div>
+                        <div class="kpi-body">
+                            <span class="kpi-value" id="kpi-streak">0</span>
+                            <span class="kpi-label">Day Streak</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <i class="fas fa-fire fa-2x"></i>
-                    <div class="stat-value" id="streak-days">0</div>
-                    <div class="stat-label">Day Streak</div>
+
+                <div class="card progress-card">
+                    <div class="card-header">
+                        <h2>Today's Progress</h2>
+                        <span class="card-meta" id="progress-meta">0 of 0</span>
+                    </div>
+                    <div class="progress-ring-wrap">
+                        <svg class="progress-ring" viewBox="0 0 120 120">
+                            <circle class="ring-bg" cx="60" cy="60" r="52"/>
+                            <circle class="ring-fill" id="progress-ring" cx="60" cy="60" r="52"/>
+                        </svg>
+                        <div class="ring-center">
+                            <span class="ring-pct" id="ring-pct">0%</span>
+                            <span class="ring-sub">Complete</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <i class="fas fa-bolt fa-2x"></i>
-                    <div class="stat-value" id="completion-rate">0%</div>
-                    <div class="stat-label">Completion Rate</div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Priority Focus</h2>
+                        <button class="text-btn" data-nav="tasks">View all</button>
+                    </div>
+                    <div class="priority-list" id="priority-list"></div>
                 </div>
+
+                <div class="card ai-insight-card" id="ai-insight-card">
+                    <div class="ai-badge"><i class="fas fa-sparkles"></i> AI Insight</div>
+                    <p class="ai-insight-text" id="ai-insight-text">Analyzing your workload...</p>
+                    <button class="ai-action-btn" id="ask-ai-btn">
+                        <i class="fas fa-comments"></i> Ask Apex AI
+                    </button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Weekly Rhythm</h2>
+                        <button class="text-btn" data-nav="habits">Details</button>
+                    </div>
+                    <div class="habit-strip" id="habit-strip"></div>
+                </div>
+            </section>
+
+            <section class="view" id="view-tasks">
+                <div class="view-header">
+                    <h1>Tasks</h1>
+                    <button class="primary-btn compact" id="add-task-fab">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+
+                <div class="filter-pills" id="task-filters">
+                    <button class="pill active" data-filter="all">All</button>
+                    <button class="pill" data-filter="active">Active</button>
+                    <button class="pill" data-filter="priority">Priority</button>
+                    <button class="pill" data-filter="completed">Done</button>
+                </div>
+
+                <div class="task-list" id="task-list"></div>
+            </section>
+
+            <section class="view" id="view-habits">
+                <div class="view-header">
+                    <h1>Habits</h1>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>This Week</h2>
+                        <span class="card-meta" id="habit-week-meta">0/7</span>
+                    </div>
+                    <div class="habit-grid-full" id="habit-grid"></div>
+                </div>
+                <div class="card">
+                    <h2 class="section-title">Consistency</h2>
+                    <p class="muted">Tap a day to mark presence. Consistency compounds.</p>
+                    <div class="consistency-bar">
+                        <div class="consistency-fill" id="consistency-fill"></div>
+                    </div>
+                    <p class="consistency-label" id="consistency-label">0% this week</p>
+                </div>
+            </section>
+
+            <section class="view" id="view-ai">
+                <div class="view-header">
+                    <h1>Apex AI</h1>
+                    <span class="ai-status"><span class="dot"></span> Online</span>
+                </div>
+                <div class="ai-chat" id="ai-chat">
+                    <div class="ai-message system">
+                        <div class="ai-avatar"><i class="fas fa-brain"></i></div>
+                        <div class="ai-bubble">
+                            <p>Good day. I am Apex AI — your executive co-pilot. I can prioritize your day, draft focus plans, summarize progress, or help you capture new tasks. How may I assist?</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="ai-suggestions" id="ai-suggestions">
+                    <button class="suggestion-chip" data-prompt="What should I focus on today?">Focus today</button>
+                    <button class="suggestion-chip" data-prompt="Summarize my progress">Progress summary</button>
+                    <button class="suggestion-chip" data-prompt="Prioritize my open tasks">Prioritize tasks</button>
+                    <button class="suggestion-chip" data-prompt="Give me a 3-item action plan">Action plan</button>
+                </div>
+                <form class="ai-input-bar" id="ai-form">
+                    <input type="text" id="ai-input" placeholder="Ask Apex AI..." autocomplete="off">
+                    <button type="submit" class="ai-send" aria-label="Send">
+                        <i class="fas fa-arrow-up"></i>
+                    </button>
+                </form>
+            </section>
+
+            <section class="view" id="view-profile">
+                <div class="view-header">
+                    <h1>Profile</h1>
+                </div>
+                <div class="profile-card">
+                    <div class="profile-avatar large">EX</div>
+                    <h2>Executive User</h2>
+                    <p class="muted">Command Center · Personal</p>
+                </div>
+                <div class="settings-list">
+                    <button class="settings-item" id="theme-toggle-btn">
+                        <i class="fas fa-moon"></i>
+                        <span>Appearance</span>
+                        <span class="settings-value" id="theme-label">Dark</span>
+                    </button>
+                    <button class="settings-item" id="clear-data-btn">
+                        <i class="fas fa-trash-alt"></i>
+                        <span>Reset Demo Data</span>
+                    </button>
+                    <div class="settings-item static">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Version</span>
+                        <span class="settings-value">1.0.0 · Apex</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <nav class="bottom-nav" id="bottom-nav">
+            <button class="nav-item active" data-view="dashboard">
+                <i class="fas fa-th-large"></i>
+                <span>Dashboard</span>
+            </button>
+            <button class="nav-item" data-view="tasks">
+                <i class="fas fa-list-check"></i>
+                <span>Tasks</span>
+            </button>
+            <button class="nav-item" data-view="habits">
+                <i class="fas fa-calendar-check"></i>
+                <span>Habits</span>
+            </button>
+            <button class="nav-item" data-view="ai">
+                <i class="fas fa-sparkles"></i>
+                <span>AI</span>
+            </button>
+            <button class="nav-item" data-view="profile">
+                <i class="fas fa-user"></i>
+                <span>Profile</span>
+            </button>
+        </nav>
+
+        <div class="modal-overlay" id="task-modal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2 id="modal-title">New Task</h2>
+                    <button class="icon-btn" id="modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <form id="task-form">
+                    <div class="form-group">
+                        <label for="task-title">Title</label>
+                        <input type="text" id="task-title" placeholder="What needs to be done?" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="task-category">Category</label>
+                            <select id="task-category">
+                                <option value="work">Work</option>
+                                <option value="personal">Personal</option>
+                                <option value="health">Health</option>
+                                <option value="learning">Learning</option>
+                                <option value="strategy">Strategy</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="task-priority">Priority</label>
+                            <select id="task-priority">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                                <option value="critical">Critical</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-due">Due Date</label>
+                        <input type="date" id="task-due">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="secondary-btn" id="modal-cancel">Cancel</button>
+                        <button type="submit" class="primary-btn" id="modal-submit">Save Task</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
