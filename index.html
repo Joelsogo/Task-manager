@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Apex">
-    <meta name="description" content="Executive task manager with health and safety wellbeing guide">
+    <meta name="description" content="Apex — tasks and health guide with personal accounts">
     <title>Apex — Executive Command</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230a0e17'/><text y='.9em' x='50%' text-anchor='middle' font-size='70' fill='%23c9a227'>A</text></svg>">
@@ -18,14 +18,57 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="app" class="app">
+    <div id="auth-screen" class="auth-screen">
+        <div class="auth-card">
+            <div class="auth-brand">
+                <span class="brand-mark">A</span>
+                <h1>Apex</h1>
+                <p class="auth-tagline">Your tasks. Your health guide. Your account.</p>
+            </div>
+            <div class="auth-tabs">
+                <button type="button" class="auth-tab active" data-auth-tab="login">Sign in</button>
+                <button type="button" class="auth-tab" data-auth-tab="register">Create account</button>
+            </div>
+            <p class="auth-error hidden" id="auth-error"></p>
+            <form id="auth-form-login" class="auth-form">
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" placeholder="you@company.com" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" placeholder="Your password" required autocomplete="current-password" minlength="6">
+                </div>
+                <button type="submit" class="primary-btn auth-submit">Sign in</button>
+            </form>
+            <form id="auth-form-register" class="auth-form hidden">
+                <div class="form-group">
+                    <label for="reg-name">Full name</label>
+                    <input type="text" id="reg-name" placeholder="Your name" required autocomplete="name">
+                </div>
+                <div class="form-group">
+                    <label for="reg-email">Email</label>
+                    <input type="email" id="reg-email" placeholder="you@company.com" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="reg-password">Password</label>
+                    <input type="password" id="reg-password" placeholder="At least 6 characters" required autocomplete="new-password" minlength="6">
+                </div>
+                <div class="form-group">
+                    <label for="reg-password2">Confirm password</label>
+                    <input type="password" id="reg-password2" placeholder="Repeat password" required autocomplete="new-password" minlength="6">
+                </div>
+                <button type="submit" class="primary-btn auth-submit">Create account</button>
+            </form>
+            <p class="auth-note">Accounts are stored on this device. Each person gets a private task list that starts empty.</p>
+        </div>
+    </div>
+
+    <div id="app" class="app hidden">
         <div class="status-bar-spacer"></div>
         <header class="app-header" id="app-header">
             <div class="header-left">
-                <div class="brand">
-                    <span class="brand-mark">A</span>
-                    <span class="brand-name">Apex</span>
-                </div>
+                <div class="brand"><span class="brand-mark">A</span><span class="brand-name">Apex</span></div>
             </div>
             <div class="header-right">
                 <div class="notif-wrap">
@@ -46,15 +89,13 @@
                     </div>
                 </div>
                 <button class="avatar-btn" id="profile-btn" aria-label="Profile">
-                    <span class="avatar-initials">EX</span>
+                    <span class="avatar-initials" id="header-initials">—</span>
                 </button>
             </div>
         </header>
+
         <aside class="side-nav" id="side-nav" aria-label="Main navigation">
-            <div class="side-brand">
-                <span class="brand-mark">A</span>
-                <span class="brand-name">Apex</span>
-            </div>
+            <div class="side-brand"><span class="brand-mark">A</span><span class="brand-name">Apex</span></div>
             <nav class="side-nav-items">
                 <button class="side-nav-item active" data-view="dashboard"><i class="fas fa-th-large"></i><span>Dashboard</span></button>
                 <button class="side-nav-item" data-view="tasks"><i class="fas fa-list-check"></i><span>Tasks</span></button>
@@ -64,11 +105,12 @@
             </nav>
             <div class="side-footer"><p class="side-tagline">Tasks + Health Guide</p></div>
         </aside>
+
         <main class="main-content" id="main-content">
             <section class="view active" id="view-dashboard">
                 <div class="greeting-block">
                     <p class="greeting-label" id="greeting-time">Good afternoon</p>
-                    <h1 class="greeting-name">Executive</h1>
+                    <h1 class="greeting-name" id="greeting-name">Welcome</h1>
                     <p class="greeting-date" id="current-date"></p>
                 </div>
                 <div class="kpi-grid">
@@ -90,12 +132,12 @@
                 </div>
                 <div class="card ai-insight-card" id="ai-insight-card">
                     <div class="ai-badge"><i class="fas fa-sparkles"></i> AI Insight</div>
-                    <p class="ai-insight-text" id="ai-insight-text">Analyzing your workload...</p>
+                    <p class="ai-insight-text" id="ai-insight-text">Your board is empty. Add a task to get started.</p>
                     <button class="ai-action-btn" id="ask-ai-btn"><i class="fas fa-comments"></i> Ask Apex AI</button>
                 </div>
                 <div class="card safety-card">
-                    <div class="ai-badge"><i class="fas fa-heart-pulse"></i> Health & Safety Guide</div>
-                    <p class="ai-insight-text" id="safety-guide-text">Apex is also your wellbeing guide. We watch continuous screen time in this app and remind you about safe habits — never use your phone while driving, riding, or walking distracted, and take breaks from long games or videos.</p>
+                    <div class="ai-badge"><i class="fas fa-heart-pulse"></i> Health &amp; Safety Guide</div>
+                    <p class="ai-insight-text" id="safety-guide-text">Apex guides safe phone use: never drive or ride while using your phone, avoid distracted walking, and take breaks from long games or videos.</p>
                     <div class="safety-topics">
                         <button type="button" class="suggestion-chip" data-safety-topic="driving">Driving</button>
                         <button type="button" class="suggestion-chip" data-safety-topic="walking">Walking</button>
@@ -103,15 +145,19 @@
                         <button type="button" class="suggestion-chip" data-safety-topic="gaming">Long gaming</button>
                         <button type="button" class="suggestion-chip" data-safety-topic="video">Long videos</button>
                     </div>
-                    <p class="muted safety-note">We guide and notify inside this app. Full monitoring of other apps or the road needs your device’s own safety tools (Do Not Disturb while driving, Screen Time, etc.).</p>
+                    <p class="muted safety-note">We guide inside this app. Use Do Not Disturb While Driving and Screen Time on your phone for full coverage.</p>
                 </div>
                 <div class="card">
                     <div class="card-header"><h2>Weekly Rhythm</h2><button class="text-btn" data-nav="habits">Details</button></div>
                     <div class="habit-strip" id="habit-strip"></div>
                 </div>
             </section>
+
             <section class="view" id="view-tasks">
-                <div class="view-header"><h1>Tasks</h1><button class="primary-btn compact" id="add-task-fab"><i class="fas fa-plus"></i></button></div>
+                <div class="view-header">
+                    <h1>Tasks</h1>
+                    <button class="primary-btn compact" id="add-task-fab"><i class="fas fa-plus"></i></button>
+                </div>
                 <div class="filter-pills" id="task-filters">
                     <button class="pill active" data-filter="all">All</button>
                     <button class="pill" data-filter="active">Active</button>
@@ -120,6 +166,7 @@
                 </div>
                 <div class="task-list" id="task-list"></div>
             </section>
+
             <section class="view" id="view-habits">
                 <div class="view-header"><h1>Habits</h1></div>
                 <div class="card">
@@ -133,17 +180,18 @@
                     <p class="consistency-label" id="consistency-label">0% this week</p>
                 </div>
             </section>
+
             <section class="view" id="view-ai">
                 <div class="view-header"><h1>Apex AI</h1><span class="ai-status"><span class="dot"></span> Online</span></div>
                 <div class="ai-chat" id="ai-chat">
                     <div class="ai-message system">
                         <div class="ai-avatar"><i class="fas fa-brain"></i></div>
-                        <div class="ai-bubble"><p>Good day. I am Apex AI — your task co-pilot and health guide. I can prioritize work, and also coach safe phone use: no driving or distracted walking, and breaks from long games or videos.</p></div>
+                        <div class="ai-bubble"><p>Good day. I am Apex AI — task co-pilot and health guide. Your list starts empty. Ask me to capture a task, prioritize, or get a safety tip.</p></div>
                     </div>
                 </div>
-                <div class="ai-suggestions" id="ai-suggestions">
+                <div class="ai-suggestions">
                     <button class="suggestion-chip" data-prompt="What should I focus on today?">Focus today</button>
-                    <button class="suggestion-chip" data-prompt="Summarize my progress">Progress</button>
+                    <button class="suggestion-chip" data-prompt="Add review weekly goals">Add a task</button>
                     <button class="suggestion-chip" data-prompt="Safety tip for driving">Driving safety</button>
                     <button class="suggestion-chip" data-prompt="Tip for long screen time">Screen time</button>
                 </div>
@@ -152,20 +200,23 @@
                     <button type="submit" class="ai-send" aria-label="Send"><i class="fas fa-arrow-up"></i></button>
                 </form>
             </section>
+
             <section class="view" id="view-profile">
                 <div class="view-header"><h1>Profile</h1></div>
                 <div class="profile-card">
-                    <div class="profile-avatar large">EX</div>
-                    <h2>Executive User</h2>
-                    <p class="muted">Tasks · Health guide · Personal</p>
+                    <div class="profile-avatar large" id="profile-avatar">—</div>
+                    <h2 id="profile-name">User</h2>
+                    <p class="muted" id="profile-email">—</p>
                 </div>
                 <div class="settings-list">
                     <button class="settings-item" id="theme-toggle-btn"><i class="fas fa-moon"></i><span>Appearance</span><span class="settings-value" id="theme-label">Dark</span></button>
-                    <button class="settings-item" id="clear-data-btn"><i class="fas fa-trash-alt"></i><span>Reset Demo Data</span></button>
-                    <div class="settings-item static"><i class="fas fa-info-circle"></i><span>Version</span><span class="settings-value">1.1.0 · Apex Guide</span></div>
+                    <button class="settings-item" id="clear-data-btn"><i class="fas fa-broom"></i><span>Clear my tasks</span></button>
+                    <button class="settings-item" id="logout-btn"><i class="fas fa-right-from-bracket"></i><span>Sign out</span></button>
+                    <div class="settings-item static"><i class="fas fa-info-circle"></i><span>Version</span><span class="settings-value">1.2.0 · Accounts</span></div>
                 </div>
             </section>
         </main>
+
         <nav class="bottom-nav" id="bottom-nav">
             <button class="nav-item active" data-view="dashboard"><i class="fas fa-th-large"></i><span>Dashboard</span></button>
             <button class="nav-item" data-view="tasks"><i class="fas fa-list-check"></i><span>Tasks</span></button>
@@ -173,17 +224,25 @@
             <button class="nav-item" data-view="ai"><i class="fas fa-sparkles"></i><span>AI</span></button>
             <button class="nav-item" data-view="profile"><i class="fas fa-user"></i><span>Profile</span></button>
         </nav>
+
         <div class="modal-overlay" id="task-modal">
             <div class="modal">
                 <div class="modal-header"><h2 id="modal-title">New Task</h2><button class="icon-btn" id="modal-close"><i class="fas fa-times"></i></button></div>
                 <form id="task-form">
                     <div class="form-group"><label for="task-title">Title</label><input type="text" id="task-title" placeholder="What needs to be done?" required></div>
                     <div class="form-row">
-                        <div class="form-group"><label for="task-category">Category</label><select id="task-category"><option value="work">Work</option><option value="personal">Personal</option><option value="health">Health</option><option value="learning">Learning</option><option value="strategy">Strategy</option></select></div>
-                        <div class="form-group"><label for="task-priority">Priority</label><select id="task-priority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div>
+                        <div class="form-group"><label for="task-category">Category</label>
+                            <select id="task-category"><option value="work">Work</option><option value="personal">Personal</option><option value="health">Health</option><option value="learning">Learning</option><option value="strategy">Strategy</option></select>
+                        </div>
+                        <div class="form-group"><label for="task-priority">Priority</label>
+                            <select id="task-priority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option></select>
+                        </div>
                     </div>
                     <div class="form-group"><label for="task-due">Due Date</label><input type="date" id="task-due"></div>
-                    <div class="form-actions"><button type="button" class="secondary-btn" id="modal-cancel">Cancel</button><button type="submit" class="primary-btn" id="modal-submit">Save Task</button></div>
+                    <div class="form-actions">
+                        <button type="button" class="secondary-btn" id="modal-cancel">Cancel</button>
+                        <button type="submit" class="primary-btn" id="modal-submit">Save Task</button>
+                    </div>
                 </form>
             </div>
         </div>

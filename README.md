@@ -1,30 +1,25 @@
 # Apex — Tasks + Health & Safety Guide
 
-Executive task manager with real-time wellbeing and phone-safety guidance.
+Executive task manager with **personal accounts**, empty boards, and health/safety guidance.
 
-## Live / hosting
+## Accounts
 
-This is a **static site** (HTML, CSS, JS). No build step.
+- **Create account** / **Sign in** with email and password
+- Each user has a **private** task list, habits, and notifications on this device
+- New accounts start with **zero tasks** (no demo data)
+- Sign out from **Profile**
+
+Accounts are stored in the browser on this device (not a central server). For cloud accounts across devices, a backend would be required.
+
+## Hosting
+
+Static site — no build step.
 
 ### GitHub Pages
 
-1. Repo → **Settings** → **Pages**
-2. Source: **Deploy from a branch**
-3. Branch: **master** / folder: **/ (root)**
-4. Save — site URL will be:
-   `https://joelsogo.github.io/Task-manager/`
-
-### Any static host
-
-Upload these files to the web root:
-
-- `index.html`
-- `script.js`
-- `style.css`
-- `manifest.json`
-- `.nojekyll` (GitHub Pages only)
-
-Examples: Netlify, Vercel, Cloudflare Pages, or any static server.
+1. **Settings → Pages**
+2. Branch: **master** / folder: **/ (root)**
+3. Live at: `https://joelsogo.github.io/Task-manager/`
 
 ```bash
 npx serve .
@@ -32,13 +27,7 @@ npx serve .
 
 ## Features
 
-- Tasks, dashboard, habits, notifications, Apex AI
-- Health & safety guide: driving, walking, riding, long gaming, long videos
-- Session screen-time alerts and daily check-ins
-- PWA-ready (`manifest.json`)
-
-## Limits
-
-Apex tracks time **inside this app** and teaches safe habits. It cannot fully monitor other apps or confirm driving. Use your phone’s Do Not Disturb While Driving and Screen Time / Digital Wellbeing as well.
-
-Language: English (clear safety wording).
+- Multi-user sign in / register
+- Tasks, dashboard, habits, Apex AI
+- Health & safety guide (driving, walking, riding, gaming, videos)
+- Session and daily wellbeing reminders
