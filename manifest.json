@@ -1,8 +1,8 @@
 {
   "name": "Apex — Executive Command",
   "short_name": "Apex",
-  "description": "Executive-grade task management and productivity command center with AI co-pilot",
-  "start_url": "./index.html",
+  "description": "Task management with health and safety wellbeing guide",
+  "start_url": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0a0e17",

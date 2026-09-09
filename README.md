@@ -1,38 +1,44 @@
 # Apex — Tasks + Health & Safety Guide
 
-Apex is an executive task manager **and** a wellbeing guide. It helps you focus on work and stay safe with your phone.
+Executive task manager with real-time wellbeing and phone-safety guidance.
 
-## What Apex does
+## Live / hosting
 
-### Tasks
-- Dashboard, priorities, habits, notifications
-- Apex AI for focus plans and progress
+This is a **static site** (HTML, CSS, JS). No build step.
 
-### Health & safety guide (real-time)
-- **Time-of-day check-ins** (morning focus, midday pause, evening wind-down)
-- **Continuous screen-time alerts** in this app (about 30 / 60 / 90 / 120 minutes)
-- **Safety education** for:
-  - Driving while using the phone
-  - Walking while distracted by the phone
-  - Riding (bike/scooter) while using the phone
-  - Playing games for hours
-  - Watching videos for hours
-- Browser **notifications** and optional **speech** reminders
-- Tap topics on the dashboard or ask Apex AI (e.g. “driving safety”)
+### GitHub Pages
 
-## Honest limits
+1. Repo → **Settings** → **Pages**
+2. Source: **Deploy from a branch**
+3. Branch: **master** / folder: **/ (root)**
+4. Save — site URL will be:
+   `https://joelsogo.github.io/Task-manager/`
 
-A web app can track time **inside Apex** and give clear safety guidance. It **cannot** fully see other apps (games, YouTube) or prove you are driving. For that, use your phone’s built-in tools:
+### Any static host
 
-- Do Not Disturb While Driving
-- Screen Time (iOS) / Digital Wellbeing (Android)
+Upload these files to the web root:
 
-## Run
+- `index.html`
+- `script.js`
+- `style.css`
+- `manifest.json`
+- `.nojekyll` (GitHub Pages only)
 
-Open `index.html` or serve the folder. Allow notifications when prompted.
+Examples: Netlify, Vercel, Cloudflare Pages, or any static server.
 
 ```bash
 npx serve .
 ```
 
-Language: **English (standard, clear safety wording)**.
+## Features
+
+- Tasks, dashboard, habits, notifications, Apex AI
+- Health & safety guide: driving, walking, riding, long gaming, long videos
+- Session screen-time alerts and daily check-ins
+- PWA-ready (`manifest.json`)
+
+## Limits
+
+Apex tracks time **inside this app** and teaches safe habits. It cannot fully monitor other apps or confirm driving. Use your phone’s Do Not Disturb While Driving and Screen Time / Digital Wellbeing as well.
+
+Language: English (clear safety wording).
