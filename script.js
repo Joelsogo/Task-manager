@@ -1,10 +1,8 @@
 (function () {
 'use strict';
-
 const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
-
 const SAFETY_MESSAGES = {
   walking: 'Safety: Using your phone while walking raises the risk of falls and accidents. Pause the screen, look up, and move safely.',
   driving: 'Critical safety: Never use your phone while driving. Put it away, use hands-free only if needed for navigation, and focus on the road.',
@@ -13,7 +11,6 @@ const SAFETY_MESSAGES = {
   video: 'Health: Watching videos for hours can disrupt sleep and posture. Follow the 20-20-20 rule: every 20 minutes, look 20 feet away for 20 seconds.',
   general: 'Wellbeing: Long continuous screen time affects focus and health. Stand, hydrate, and rest your eyes before you continue.'
 };
-
 const WELLBEING_SLOTS = [
   { h: 7, m: 30, msg: 'Good morning. Set one clear priority. Protect focus time and keep your phone down while walking or commuting.' },
   { h: 9, m: 30, msg: 'Late morning: Stay with deep work. If you are on the move, put the phone away until you stop safely.' },
@@ -23,863 +20,87 @@ const WELLBEING_SLOTS = [
   { h: 18, m: 0, msg: 'Evening wind-down. Capture remaining tasks and reduce entertainment screen time for better sleep.' },
   { h: 20, m: 0, msg: 'End of day. Limit games and videos before bed. Rest supports tomorrow\'s health and focus.' }
 ];
-
 const SESSION_ALERTS = [
   { mins: 30, key: '30m', msg: SAFETY_MESSAGES.general },
   { mins: 60, key: '60m', msg: 'Health: You have been on screen about an hour. Stand up, stretch, and rest your eyes for a few minutes.' },
   { mins: 90, key: '90m', msg: SAFETY_MESSAGES.video },
   { mins: 120, key: '120m', msg: 'Health & safety: Two hours of continuous use. Take a real break. Avoid games or videos for the next stretch of time.' }
 ];
-
-let currentUser = null;
-let tasks = [];
-let habits = [0, 0, 0, 0, 0, 0, 0];
-let dismissedNotifs = [];
-let currentFilter = 'all';
-let editingId = null;
-let currentView = 'dashboard';
-let lastWellbeingKey = '';
-let wellbeingEnabled = true;
-let sessionStart = Date.now();
-let sessionAlerted = {};
-let appBooted = false;
-
-function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
-
-function addDays(d, n) {
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
-}
-
-function escapeHtml(str) {
-  const d = document.createElement('div');
-  d.textContent = str == null ? '' : String(str);
-  return d.innerHTML;
-}
-
-function setText(id, val) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = val;
-}
-
-function storageKey(suffix) {
-  if (!currentUser) return null;
-  return 'apex_u_' + currentUser.id + '_' + suffix;
-}
-
-function loadUsers() {
-  try {
-    return JSON.parse(localStorage.getItem('apex_users') || '{}');
-  } catch (e) {
-    return {};
-  }
-}
-
-function saveUsers(users) {
-  localStorage.setItem('apex_users', JSON.stringify(users));
-}
-
-async function hashPassword(password, salt) {
-  const raw = salt + '|' + password;
-  if (window.crypto && window.crypto.subtle) {
-    const data = new TextEncoder().encode(raw);
-    const buf = await crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
-  }
-  let h = 2166136261;
-  for (let i = 0; i < raw.length; i++) {
-    h ^= raw.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return 'x' + (h >>> 0).toString(16);
-}
-
-function getSession() {
-  try {
-    return JSON.parse(localStorage.getItem('apex_session') || 'null');
-  } catch (e) {
-    return null;
-  }
-}
-
-function setSession(user) {
-  if (!user) {
-    localStorage.removeItem('apex_session');
-    return;
-  }
-  localStorage.setItem('apex_session', JSON.stringify({ id: user.id, email: user.email }));
-}
-
-function loadUserData() {
-  if (!currentUser) {
-    tasks = [];
-    habits = [0, 0, 0, 0, 0, 0, 0];
-    dismissedNotifs = [];
-    return;
-  }
-  try {
-    tasks = JSON.parse(localStorage.getItem(storageKey('tasks')) || '[]');
-  } catch (e) {
-    tasks = [];
-  }
-  try {
-    habits = JSON.parse(localStorage.getItem(storageKey('habits')) || '[0,0,0,0,0,0,0]');
-    if (!Array.isArray(habits) || habits.length !== 7) habits = [0, 0, 0, 0, 0, 0, 0];
-  } catch (e) {
-    habits = [0, 0, 0, 0, 0, 0, 0];
-  }
-  try {
-    dismissedNotifs = JSON.parse(localStorage.getItem(storageKey('dismissed')) || '[]');
-  } catch (e) {
-    dismissedNotifs = [];
-  }
-  lastWellbeingKey = localStorage.getItem(storageKey('wellbeing_key')) || '';
-  sessionAlerted = JSON.parse(localStorage.getItem(storageKey('session_alerts')) || '{}');
-  wellbeingEnabled = localStorage.getItem(storageKey('wellbeing_on')) !== '0';
-}
-
-function persist() {
-  if (!currentUser) return;
-  localStorage.setItem(storageKey('tasks'), JSON.stringify(tasks));
-  localStorage.setItem(storageKey('habits'), JSON.stringify(habits));
-  localStorage.setItem(storageKey('dismissed'), JSON.stringify(dismissedNotifs));
-}
-
-function initials(name) {
-  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '—';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function showAuthError(msg) {
-  const el = $('#auth-error');
-  if (!el) return;
-  if (!msg) {
-    el.classList.add('hidden');
-    el.textContent = '';
-    return;
-  }
-  el.textContent = msg;
-  el.classList.remove('hidden');
-}
-
-function showAuth() {
-  $('#auth-screen')?.classList.remove('hidden');
-  $('#app')?.classList.add('hidden');
-  document.body.classList.add('auth-open');
-}
-
-function showApp() {
-  $('#auth-screen')?.classList.add('hidden');
-  $('#app')?.classList.remove('hidden');
-  document.body.classList.remove('auth-open');
-}
-
-function updateProfileUI() {
-  if (!currentUser) return;
-  const name = currentUser.name || 'User';
-  const email = currentUser.email || '';
-  const init = initials(name);
-  setText('greeting-name', name.split(' ')[0] || name);
-  setText('profile-name', name);
-  setText('profile-email', email);
-  setText('header-initials', init);
-  const av = $('#profile-avatar');
-  if (av) av.textContent = init;
-}
-
-async function registerUser(name, email, password) {
-  const users = loadUsers();
-  const key = email.trim().toLowerCase();
-  if (!key || !key.includes('@')) throw new Error('Enter a valid email address.');
-  if (password.length < 6) throw new Error('Password must be at least 6 characters.');
-  if (users[key]) throw new Error('An account with this email already exists. Sign in instead.');
-  const salt = uid();
-  const passHash = await hashPassword(password, salt);
-  const user = {
-    id: uid(),
-    name: name.trim(),
-    email: key,
-    salt,
-    passHash,
-    created: Date.now()
-  };
-  users[key] = user;
-  saveUsers(users);
-  return user;
-}
-
-async function loginUser(email, password) {
-  const users = loadUsers();
-  const key = email.trim().toLowerCase();
-  const user = users[key];
-  if (!user) throw new Error('No account found for that email. Create an account first.');
-  const passHash = await hashPassword(password, user.salt);
-  if (passHash !== user.passHash) throw new Error('Incorrect password. Try again.');
-  return user;
-}
-
-function logout() {
-  setSession(null);
-  currentUser = null;
-  tasks = [];
-  habits = [0, 0, 0, 0, 0, 0, 0];
-  dismissedNotifs = [];
-  showAuth();
-}
-
-function enterSession(user) {
-  currentUser = user;
-  setSession(user);
-  loadUserData();
-  sessionStart = Date.now();
-  showApp();
-  updateProfileUI();
-  if (!appBooted) {
-    bootApp();
-    appBooted = true;
-  } else {
-    renderAll();
-    updateNotifications();
-    updateGreeting();
-  }
-}
-
-function setupAuth() {
-  $$('.auth-tab').forEach((tab) => {
-    tab.addEventListener('click', () => {
-      $$('.auth-tab').forEach((t) => t.classList.remove('active'));
-      tab.classList.add('active');
-      const mode = tab.dataset.authTab;
-      $('#auth-form-login')?.classList.toggle('hidden', mode !== 'login');
-      $('#auth-form-register')?.classList.toggle('hidden', mode !== 'register');
-      showAuthError('');
-    });
-  });
-
-  $('#auth-form-login')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    showAuthError('');
-    const email = $('#login-email')?.value || '';
-    const password = $('#login-password')?.value || '';
-    try {
-      const user = await loginUser(email, password);
-      enterSession(user);
-    } catch (err) {
-      showAuthError(err.message || 'Sign in failed.');
-    }
-  });
-
-  $('#auth-form-register')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    showAuthError('');
-    const name = $('#reg-name')?.value || '';
-    const email = $('#reg-email')?.value || '';
-    const password = $('#reg-password')?.value || '';
-    const password2 = $('#reg-password2')?.value || '';
-    if (password !== password2) {
-      showAuthError('Passwords do not match.');
-      return;
-    }
-    try {
-      const user = await registerUser(name, email, password);
-      enterSession(user);
-    } catch (err) {
-      showAuthError(err.message || 'Could not create account.');
-    }
-  });
-}
-
-function formatDue(iso) {
-  const today = new Date().toISOString().slice(0, 10);
-  const tom = addDays(new Date(), 1).toISOString().slice(0, 10);
-  if (iso === today) return 'Today';
-  if (iso === tom) return 'Tomorrow';
-  return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function detectLayout() {
-  const isDesktop = window.matchMedia('(min-width: 768px)').matches;
-  document.body.classList.toggle('is-desktop', isDesktop);
-  document.body.classList.toggle('is-mobile', !isDesktop);
-}
-
-function debounce(fn, ms) {
-  let t;
-  return function () {
-    clearTimeout(t);
-    t = setTimeout(fn, ms);
-  };
-}
-
-function switchView(view) {
-  currentView = view;
-  $$('.view').forEach((v) => v.classList.remove('active'));
-  $$('.nav-item').forEach((n) => n.classList.remove('active'));
-  $$('.side-nav-item').forEach((n) => n.classList.remove('active'));
-  const target = $(`#view-${view}`);
-  if (target) target.classList.add('active');
-  const nav = $(`.nav-item[data-view="${view}"]`);
-  if (nav) nav.classList.add('active');
-  const side = $(`.side-nav-item[data-view="${view}"]`);
-  if (side) side.classList.add('active');
-  closeNotifPanel();
-  if (view === 'dashboard') renderDashboard();
-  if (view === 'tasks') renderTasks();
-  if (view === 'habits') renderHabits();
-  if (view === 'ai') {
-    const chat = $('#ai-chat');
-    if (chat) chat.scrollTop = chat.scrollHeight;
-  }
-}
-
-function setupNavigation() {
-  $$('.nav-item, .side-nav-item').forEach((btn) =>
-    btn.addEventListener('click', () => {
-      const view = btn.dataset.view;
-      if (view) switchView(view);
-    })
-  );
-  $$('[data-nav]').forEach((btn) => btn.addEventListener('click', () => switchView(btn.dataset.nav)));
-  $('#ask-ai-btn')?.addEventListener('click', () => switchView('ai'));
-  $('#profile-btn')?.addEventListener('click', () => switchView('profile'));
-}
-
-function updateGreeting() {
-  const now = new Date();
-  const h = now.getHours();
-  let g = 'Good evening';
-  if (h < 12) g = 'Good morning';
-  else if (h < 17) g = 'Good afternoon';
-  setText('greeting-time', g);
-  const dateEl = $('#current-date');
-  if (dateEl) dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-}
-
-function renderAll() {
-  renderDashboard();
-  renderTasks();
-  renderHabits();
-  updateNotifications();
-}
-
-function buildNotifications() {
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const items = [];
-  tasks.forEach((t) => {
-    if (t.completed) return;
-    if (t.due && t.due < todayStr) {
-      items.push({ id: 'overdue-' + t.id, taskId: t.id, type: 'overdue', title: t.title, msg: 'Overdue — was due ' + formatDue(t.due), time: 'Due' });
-    } else if (t.due === todayStr) {
-      items.push({ id: 'due-' + t.id, taskId: t.id, type: 'due', title: t.title, msg: 'Due today · ' + t.priority + ' priority', time: 'Today' });
-    } else if (t.priority === 'critical' || t.priority === 'high') {
-      items.push({ id: 'prio-' + t.id, taskId: t.id, type: 'priority', title: t.title, msg: t.priority + ' priority · ' + (t.category || ''), time: t.due ? formatDue(t.due) : 'Open' });
-    }
-  });
-  const order = { overdue: 0, due: 1, priority: 2 };
-  items.sort((a, b) => (order[a.type] || 9) - (order[b.type] || 9));
-  const seen = new Set();
-  const unique = [];
-  for (const n of items) {
-    if (seen.has(n.taskId)) continue;
-    seen.add(n.taskId);
-    if (!dismissedNotifs.includes(n.id)) unique.push(n);
-  }
-  return unique;
-}
-
-function updateNotifications() {
-  const list = buildNotifications();
-  const badge = $('#notif-badge');
-  const listEl = $('#notif-list');
-  const emptyEl = $('#notif-empty');
-  if (badge) {
-    if (list.length > 0) {
-      badge.textContent = list.length > 9 ? '9+' : String(list.length);
-      badge.classList.remove('hidden');
-    } else badge.classList.add('hidden');
-  }
-  if (!listEl) return;
-  if (list.length === 0) {
-    listEl.innerHTML = '';
-    emptyEl?.classList.remove('hidden');
-    return;
-  }
-  emptyEl?.classList.add('hidden');
-  const iconMap = { overdue: 'fa-exclamation-circle', due: 'fa-clock', priority: 'fa-flag', info: 'fa-info-circle' };
-  listEl.innerHTML = list
-    .map(
-      (n) =>
-        `<button type="button" class="notif-item unread" data-notif-id="${n.id}" data-task-id="${n.taskId}"><div class="notif-icon ${n.type}"><i class="fas ${iconMap[n.type] || iconMap.info}"></i></div><div class="notif-body"><div class="notif-title">${escapeHtml(n.title)}</div><div class="notif-msg">${escapeHtml(n.msg)}</div></div><span class="notif-time">${escapeHtml(n.time)}</span></button>`
-    )
-    .join('');
-}
-
-function setupNotifications() {
-  const btn = $('#notif-btn');
-  const panel = $('#notif-panel');
-  btn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const open = panel?.classList.toggle('open');
-    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (open) updateNotifications();
-  });
-  $('#notif-clear')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    buildNotifications().forEach((n) => {
-      if (!dismissedNotifs.includes(n.id)) dismissedNotifs.push(n.id);
-    });
-    persist();
-    updateNotifications();
-    closeNotifPanel();
-  });
-  $('#notif-list')?.addEventListener('click', (e) => {
-    const item = e.target.closest('.notif-item');
-    if (!item) return;
-    const notifId = item.dataset.notifId;
-    if (notifId && !dismissedNotifs.includes(notifId)) {
-      dismissedNotifs.push(notifId);
-      persist();
-    }
-    closeNotifPanel();
-    switchView('tasks');
-    updateNotifications();
-  });
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.notif-wrap')) closeNotifPanel();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeNotifPanel();
-  });
-}
-
-function closeNotifPanel() {
-  $('#notif-panel')?.classList.remove('open');
-  $('#notif-btn')?.setAttribute('aria-expanded', 'false');
-}
-
-function renderDashboard() {
-  const active = tasks.filter((t) => !t.completed);
-  const done = tasks.filter((t) => t.completed);
-  const total = tasks.length;
-  const rate = total ? Math.round((done.length / total) * 100) : 0;
-  const streak = habits.filter(Boolean).length;
-  setText('kpi-focus', active.length);
-  setText('kpi-done', done.length);
-  setText('kpi-rate', rate + '%');
-  setText('kpi-streak', streak);
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const todayTasks = tasks.filter((t) => t.due === todayStr);
-  const todayDone = todayTasks.filter((t) => t.completed).length;
-  const pct = todayTasks.length ? Math.round((todayDone / todayTasks.length) * 100) : 0;
-  setText('ring-pct', pct + '%');
-  setText('progress-meta', `${todayDone} of ${todayTasks.length}`);
-  const ring = $('#progress-ring');
-  if (ring) {
-    const circ = 2 * Math.PI * 52;
-    ring.style.strokeDasharray = circ;
-    ring.style.strokeDashoffset = circ - (pct / 100) * circ;
-  }
-  const priority = active.filter((t) => t.priority === 'critical' || t.priority === 'high').slice(0, 4);
-  const list = $('#priority-list');
-  if (list) {
-    if (!priority.length) {
-      list.innerHTML = '<div class="empty-mini">No high-priority items yet. Add a task to get started.</div>';
-    } else {
-      list.innerHTML = priority
-        .map(
-          (t) =>
-            `<div class="priority-item" data-id="${t.id}"><span class="prio-dot ${t.priority}"></span><span class="priority-title">${escapeHtml(t.title)}</span><span class="priority-cat">${escapeHtml(t.category)}</span></div>`
-        )
-        .join('');
-    }
-  }
-  generateInsight();
-  renderHabitStrip();
-}
-
-function generateInsight() {
-  const el = $('#ai-insight-text');
-  if (!el) return;
-  const active = tasks.filter((t) => !t.completed);
-  const critical = active.filter((t) => t.priority === 'critical');
-  const dueToday = active.filter((t) => t.due === new Date().toISOString().slice(0, 10));
-  let text = '';
-  if (critical.length) text = `You have ${critical.length} critical item(s). Lead with "${critical[0].title}".`;
-  else if (dueToday.length) text = `${dueToday.length} task(s) due today. Sequence by priority.`;
-  else if (active.length) text = `${active.length} open task(s). Keep steady progress.`;
-  else text = 'Your board is empty. Add your first task to begin.';
-  el.textContent = text;
-}
-
-function renderHabitStrip() {
-  const strip = $('#habit-strip');
-  if (!strip) return;
-  const todayIdx = (new Date().getDay() + 6) % 7;
-  strip.innerHTML = DAYS.map((d, i) => `<div class="habit-day-mini ${habits[i] ? 'active' : ''} ${i === todayIdx ? 'today' : ''}">${d}</div>`).join('');
-}
-
-function renderTasks() {
-  const list = $('#task-list');
-  if (!list) return;
-  let filtered = [...tasks];
-  if (currentFilter === 'active') filtered = filtered.filter((t) => !t.completed);
-  else if (currentFilter === 'completed') filtered = filtered.filter((t) => t.completed);
-  else if (currentFilter === 'priority') filtered = filtered.filter((t) => !t.completed && (t.priority === 'high' || t.priority === 'critical'));
-  const pW = { critical: 0, high: 1, medium: 2, low: 3 };
-  filtered.sort((a, b) => (a.completed !== b.completed ? (a.completed ? 1 : -1) : (pW[a.priority] || 9) - (pW[b.priority] || 9)));
-  if (!filtered.length) {
-    list.innerHTML = '<div class="empty-state"><i class="fas fa-clipboard-check"></i><p>No tasks yet. Tap + to add your first one.</p></div>';
-    return;
-  }
-  const todayStr = new Date().toISOString().slice(0, 10);
-  list.innerHTML = filtered
-    .map((t) => {
-      const overdue = t.due && t.due < todayStr && !t.completed;
-      return `<div class="task-item ${t.completed ? 'completed' : ''}" data-id="${t.id}"><input type="checkbox" class="task-check" ${t.completed ? 'checked' : ''} data-action="toggle"><div class="task-body"><div class="task-title">${escapeHtml(t.title)}</div><div class="task-meta"><span class="task-tag ${t.category}">${escapeHtml(t.category)}</span><span class="task-tag">${escapeHtml(t.priority)}</span>${t.due ? `<span class="task-due ${overdue ? 'overdue' : ''}"><i class="far fa-calendar"></i> ${formatDue(t.due)}</span>` : ''}</div></div><div class="task-actions"><button class="task-action" data-action="edit" aria-label="Edit"><i class="fas fa-pen"></i></button><button class="task-action" data-action="delete" aria-label="Delete"><i class="fas fa-trash-alt"></i></button></div></div>`;
-    })
-    .join('');
-}
-
-function renderHabits() {
-  const grid = $('#habit-grid');
-  if (!grid) return;
-  const todayIdx = (new Date().getDay() + 6) % 7;
-  const done = habits.filter(Boolean).length;
-  grid.innerHTML = DAYS.map(
-    (d, i) => `<div class="habit-day ${habits[i] ? 'active' : ''} ${i === todayIdx ? 'today' : ''} ${i > todayIdx ? 'future' : ''}" data-idx="${i}">${d}</div>`
-  ).join('');
-  setText('habit-week-meta', `${done}/7`);
-  const fill = $('#consistency-fill');
-  const label = $('#consistency-label');
-  const pct = Math.round((done / 7) * 100);
-  if (fill) fill.style.width = pct + '%';
-  if (label) label.textContent = `${pct}% this week`;
-}
-
-function openModal(task = null) {
-  editingId = task ? task.id : null;
-  $('#modal-title').textContent = task ? 'Edit Task' : 'New Task';
-  $('#task-title').value = task ? task.title : '';
-  $('#task-category').value = task ? task.category : 'work';
-  $('#task-priority').value = task ? task.priority : 'medium';
-  $('#task-due').value = task ? task.due || '' : '';
-  $('#task-modal').classList.add('open');
-  setTimeout(() => $('#task-title')?.focus(), 100);
-}
-
-function closeModal() {
-  $('#task-modal')?.classList.remove('open');
-  editingId = null;
-}
-
-function saveTask(e) {
-  e.preventDefault();
-  const title = $('#task-title').value.trim();
-  if (!title) return;
-  const data = {
-    title,
-    category: $('#task-category').value,
-    priority: $('#task-priority').value,
-    due: $('#task-due').value || null
-  };
-  if (editingId) {
-    const idx = tasks.findIndex((t) => t.id === editingId);
-    if (idx !== -1) tasks[idx] = { ...tasks[idx], ...data };
-  } else {
-    tasks.unshift({ id: uid(), ...data, completed: false, created: Date.now() });
-  }
-  persist();
-  closeModal();
-  renderAll();
-}
-
-function handleAI(prompt) {
-  const chat = $('#ai-chat');
-  if (!chat) return;
-  appendMessage('user', prompt);
-  const thinking = document.createElement('div');
-  thinking.className = 'ai-message system';
-  thinking.innerHTML = '<div class="ai-avatar"><i class="fas fa-brain"></i></div><div class="ai-bubble"><p>Analyzing…</p></div>';
-  chat.appendChild(thinking);
-  chat.scrollTop = chat.scrollHeight;
-  setTimeout(() => {
-    thinking.remove();
-    appendMessage('system', generateAIResponse(prompt));
-  }, 450);
-}
-
-function appendMessage(role, text) {
-  const chat = $('#ai-chat');
-  if (!chat) return;
-  const div = document.createElement('div');
-  div.className = `ai-message ${role === 'user' ? 'user' : 'system'}`;
-  div.innerHTML = `<div class="ai-avatar"><i class="fas ${role === 'user' ? 'fa-user' : 'fa-brain'}"></i></div><div class="ai-bubble">${text}</div>`;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
-}
-
-function generateAIResponse(prompt) {
-  const p = prompt.toLowerCase().trim();
-  const active = tasks.filter((t) => !t.completed);
-  const done = tasks.filter((t) => t.completed);
-  const critical = active.filter((t) => t.priority === 'critical');
-  const dueToday = active.filter((t) => t.due === new Date().toISOString().slice(0, 10));
-  const rate = tasks.length ? Math.round((done.length / tasks.length) * 100) : 0;
-
-  if (/driv|walk|rid(e|ing)|game|gaming|video|screen time|health|safety|distract/i.test(p)) {
-    const topic = /driv/i.test(p) ? 'driving' : /walk/i.test(p) ? 'walking' : /rid/i.test(p) ? 'riding' : /game|gaming/i.test(p) ? 'gaming' : /video/i.test(p) ? 'video' : 'general';
-    return `<p><strong>Health & safety guide</strong></p><p>${SAFETY_MESSAGES[topic]}</p><p>Apex reminds you during long sessions in this app. For driving, enable Do Not Disturb While Driving.</p>`;
-  }
-  if (/focus|priorit|today|what should/i.test(p)) {
-    if (critical.length) return `<p><strong>Focus:</strong> ${escapeHtml(critical[0].title)}</p>`;
-    if (dueToday.length) return `<p>Due today:</p><ul>${dueToday.map((t) => `<li>${escapeHtml(t.title)}</li>`).join('')}</ul>`;
-    if (active.length) return `<p>Top items:</p><ul>${active.slice(0, 3).map((t) => `<li>${escapeHtml(t.title)}</li>`).join('')}</ul>`;
-    return '<p>Your list is empty. Add a task first, or say “Add prepare weekly report”.</p>';
-  }
-  if (/summar|progress|status/i.test(p)) {
-    return `<p><strong>Snapshot</strong></p><ul><li>Open: ${active.length}</li><li>Done: ${done.length}</li><li>Hit rate: ${rate}%</li></ul>`;
-  }
-  if (/add |create |new task|remind/i.test(p)) {
-    const match = p.replace(/^(add|create|new task|remind me to|remind)\s+/i, '').trim();
-    if (match.length > 2) {
-      const title = match.charAt(0).toUpperCase() + match.slice(1);
-      tasks.unshift({ id: uid(), title, category: 'work', priority: 'medium', due: null, completed: false, created: Date.now() });
-      persist();
-      renderAll();
-      return `<p>Captured: <strong>${escapeHtml(title)}</strong></p>`;
-    }
-    return '<p>Tell me the task title to capture.</p>';
-  }
-  return '<p>I can help with tasks, focus, progress, or health & safety tips (driving, walking, gaming, videos).</p>';
-}
-
-function speakGuide(text) {
-  try {
-    if (!('speechSynthesis' in window)) return;
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate = 0.95;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
-  } catch (e) {}
-}
-
-async function notifyGuide(title, text, tag) {
-  try {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'default') await Notification.requestPermission();
-    if (Notification.permission === 'granted') {
-      new Notification(title || 'Apex Health & Safety', { body: text, tag: tag || 'apex-guide' });
-    }
-  } catch (e) {}
-}
-
-function showGuideInsight(text) {
-  const insight = document.getElementById('ai-insight-text');
-  if (insight) insight.textContent = text;
-  const safetyEl = document.getElementById('safety-guide-text');
-  if (safetyEl) safetyEl.textContent = text;
-}
-
-function fireGuide(title, msg, tag) {
-  if (!currentUser) return;
-  showGuideInsight(msg);
-  notifyGuide(title, msg, tag);
-  speakGuide(msg);
-}
-
-function wellbeingKey(slot) {
-  return new Date().toISOString().slice(0, 10) + '-' + slot.h + ':' + slot.m;
-}
-
-function checkWellbeingSlots() {
-  if (!wellbeingEnabled || !currentUser) return;
-  const now = new Date();
-  const mins = now.getHours() * 60 + now.getMinutes();
-  for (const slot of WELLBEING_SLOTS) {
-    const slotMins = slot.h * 60 + slot.m;
-    if (mins >= slotMins && mins < slotMins + 5) {
-      const key = wellbeingKey(slot);
-      if (key === lastWellbeingKey) return;
-      lastWellbeingKey = key;
-      localStorage.setItem(storageKey('wellbeing_key'), key);
-      fireGuide('Apex Wellbeing', slot.msg, 'apex-wellbeing-slot');
-      return;
-    }
-  }
-}
-
-function checkSessionHealth() {
-  if (!wellbeingEnabled || !currentUser || document.hidden) return;
-  const elapsedMin = Math.floor((Date.now() - sessionStart) / 60000);
-  const day = new Date().toISOString().slice(0, 10);
-  for (const alert of SESSION_ALERTS) {
-    if (elapsedMin >= alert.mins) {
-      const alertKey = day + '-' + alert.key;
-      if (sessionAlerted[alertKey]) continue;
-      sessionAlerted[alertKey] = true;
-      localStorage.setItem(storageKey('session_alerts'), JSON.stringify(sessionAlerted));
-      fireGuide('Screen time care', alert.msg, 'apex-session-' + alert.key);
-      break;
-    }
-  }
-}
-
-function onVisibilityChange() {
-  if (!document.hidden) {
-    const gap = Date.now() - (window._apexLastHidden || Date.now());
-    if (gap > 15 * 60 * 1000) sessionStart = Date.now();
-  }
-  window._apexLastHidden = Date.now();
-}
-
-function guideTopic(topic) {
-  fireGuide('Health & safety guide', SAFETY_MESSAGES[topic] || SAFETY_MESSAGES.general, 'apex-guide-' + topic);
-}
-
-function setupWellbeing() {
-  checkWellbeingSlots();
-  checkSessionHealth();
-  setInterval(() => {
-    checkWellbeingSlots();
-    checkSessionHealth();
-  }, 60 * 1000);
-  document.addEventListener('visibilitychange', onVisibilityChange);
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission().catch(() => {});
-  }
-  document.querySelectorAll('[data-safety-topic]').forEach((btn) => {
-    btn.addEventListener('click', () => guideTopic(btn.dataset.safetyTopic));
-  });
-}
-
-function setupEventListeners() {
-  $$('#task-filters .pill').forEach((pill) => {
-    pill.addEventListener('click', () => {
-      $$('#task-filters .pill').forEach((p) => p.classList.remove('active'));
-      pill.classList.add('active');
-      currentFilter = pill.dataset.filter;
-      renderTasks();
-    });
-  });
-
-  $('#task-list')?.addEventListener('click', (e) => {
-    const item = e.target.closest('.task-item');
-    if (!item) return;
-    const id = item.dataset.id;
-    const action = e.target.closest('[data-action]')?.dataset.action;
-    if (action === 'toggle' || e.target.classList.contains('task-check')) {
-      const t = tasks.find((x) => x.id === id);
-      if (t) {
-        t.completed = !t.completed;
-        persist();
-        renderAll();
-      }
-    } else if (action === 'edit') {
-      const t = tasks.find((x) => x.id === id);
-      if (t) openModal(t);
-    } else if (action === 'delete') {
-      if (confirm('Remove this task?')) {
-        tasks = tasks.filter((x) => x.id !== id);
-        persist();
-        renderAll();
-      }
-    }
-  });
-
-  $('#priority-list')?.addEventListener('click', (e) => {
-    if (e.target.closest('.priority-item')) switchView('tasks');
-  });
-
-  $('#habit-grid')?.addEventListener('click', (e) => {
-    const day = e.target.closest('.habit-day');
-    if (!day || day.classList.contains('future')) return;
-    const idx = +day.dataset.idx;
-    habits[idx] = habits[idx] ? 0 : 1;
-    persist();
-    renderHabits();
-    renderDashboard();
-  });
-
-  $('#add-task-fab')?.addEventListener('click', () => openModal());
-  $('#modal-close')?.addEventListener('click', closeModal);
-  $('#modal-cancel')?.addEventListener('click', closeModal);
-  $('#task-form')?.addEventListener('submit', saveTask);
-  $('#task-modal')?.addEventListener('click', (e) => {
-    if (e.target === $('#task-modal')) closeModal();
-  });
-
-  $('#ai-form')?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const input = $('#ai-input');
-    const val = input.value.trim();
-    if (!val) return;
-    input.value = '';
-    handleAI(val);
-  });
-
-  $$('.suggestion-chip').forEach((chip) => {
-    if (chip.dataset.prompt) chip.addEventListener('click', () => handleAI(chip.dataset.prompt));
-  });
-
-  $('#theme-toggle-btn')?.addEventListener('click', () => {
-    document.body.classList.toggle('light-mode');
-    const isLight = document.body.classList.contains('light-mode');
-    setText('theme-label', isLight ? 'Light' : 'Dark');
-    const icon = $('#theme-toggle-btn i');
-    if (icon) icon.className = isLight ? 'fas fa-sun' : 'fas fa-moon';
-  });
-
-  $('#clear-data-btn')?.addEventListener('click', () => {
-    if (!confirm('Clear all your tasks and habits on this account? This cannot be undone.')) return;
-    tasks = [];
-    habits = [0, 0, 0, 0, 0, 0, 0];
-    dismissedNotifs = [];
-    persist();
-    renderAll();
-  });
-
-  $('#logout-btn')?.addEventListener('click', () => {
-    if (confirm('Sign out of Apex?')) logout();
-  });
-}
-
-function bootApp() {
-  setupNavigation();
-  setupEventListeners();
-  setupNotifications();
-  updateGreeting();
-  renderAll();
-  updateNotifications();
-  detectLayout();
-  window.addEventListener('resize', debounce(detectLayout, 150));
-  setupWellbeing();
-}
-
-function init() {
-  try {
-    localStorage.removeItem('apex_tasks');
-    localStorage.removeItem('apex_habits');
-    localStorage.removeItem('apex_dismissed_notifs');
-  } catch (e) {}
-
-  setupAuth();
-
-  const session = getSession();
-  if (session && session.email) {
-    const users = loadUsers();
-    const user = users[session.email];
-    if (user && user.id === session.id) {
-      enterSession(user);
-      return;
-    }
-  }
-  showAuth();
-}
-
-document.addEventListener('DOMContentLoaded', init);
+const FALLBACK_QUOTES = [
+  { q: 'The secret of getting ahead is getting started.', a: 'Mark Twain' },
+  { q: 'It always seems impossible until it is done.', a: 'Nelson Mandela' },
+  { q: 'Discipline is the bridge between goals and accomplishment.', a: 'Jim Rohn' },
+  { q: 'Small daily improvements are the key to staggering long-term results.', a: 'Robin Sharma' },
+  { q: 'Focus on being productive instead of busy.', a: 'Tim Ferriss' },
+  { q: 'Do what you can, with what you have, where you are.', a: 'Theodore Roosevelt' },
+  { q: 'Success is the sum of small efforts repeated day in and day out.', a: 'Robert Collier' },
+  { q: 'Your future is created by what you do today, not tomorrow.', a: 'Robert Kiyosaki' }
+];
+let currentUser = null, tasks = [], habits = [0,0,0,0,0,0,0], dismissedNotifs = [], currentFilter = 'all', editingId = null, currentView = 'dashboard';
+let lastWellbeingKey = '', wellbeingEnabled = true, sessionStart = Date.now(), sessionAlerted = {}, appBooted = false;
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
+function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x}
+function escapeHtml(str){const d=document.createElement('div');d.textContent=str==null?'':String(str);return d.innerHTML}
+function setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val}
+function storageKey(suffix){if(!currentUser)return null;return 'apex_u_'+currentUser.id+'_'+suffix}
+function loadUsers(){try{return JSON.parse(localStorage.getItem('apex_users')||'{}')}catch(e){return {}}}
+function saveUsers(users){localStorage.setItem('apex_users',JSON.stringify(users))}
+async function hashPassword(password,salt){const raw=salt+'|'+password;if(window.crypto&&window.crypto.subtle){const data=new TextEncoder().encode(raw);const buf=await crypto.subtle.digest('SHA-256',data);return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('')}let h=2166136261;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619)}return 'x'+(h>>>0).toString(16)}
+function getSession(){try{return JSON.parse(localStorage.getItem('apex_session')||'null')}catch(e){return null}}
+function setSession(user){if(!user){localStorage.removeItem('apex_session');return}localStorage.setItem('apex_session',JSON.stringify({id:user.id,email:user.email}))}
+function loadUserData(){if(!currentUser){tasks=[];habits=[0,0,0,0,0,0,0];dismissedNotifs=[];return}try{tasks=JSON.parse(localStorage.getItem(storageKey('tasks'))||'[]')}catch(e){tasks=[]}try{habits=JSON.parse(localStorage.getItem(storageKey('habits'))||'[0,0,0,0,0,0,0]');if(!Array.isArray(habits)||habits.length!==7)habits=[0,0,0,0,0,0,0]}catch(e){habits=[0,0,0,0,0,0,0]}try{dismissedNotifs=JSON.parse(localStorage.getItem(storageKey('dismissed'))||'[]')}catch(e){dismissedNotifs=[]}lastWellbeingKey=localStorage.getItem(storageKey('wellbeing_key'))||'';sessionAlerted=JSON.parse(localStorage.getItem(storageKey('session_alerts'))||'{}');wellbeingEnabled=localStorage.getItem(storageKey('wellbeing_on'))!=='0'}
+function persist(){if(!currentUser)return;localStorage.setItem(storageKey('tasks'),JSON.stringify(tasks));localStorage.setItem(storageKey('habits'),JSON.stringify(habits));localStorage.setItem(storageKey('dismissed'),JSON.stringify(dismissedNotifs))}
+function initials(name){const parts=(name||'').trim().split(/\s+/).filter(Boolean);if(!parts.length)return '—';if(parts.length===1)return parts[0].slice(0,2).toUpperCase();return (parts[0][0]+parts[parts.length-1][0]).toUpperCase()}
+function showAuthError(msg){const el=$('#auth-error');if(!el)return;if(!msg){el.classList.add('hidden');el.textContent='';return}el.textContent=msg;el.classList.remove('hidden')}
+function showAuth(){$('#auth-screen')?.classList.remove('hidden');$('#app')?.classList.add('hidden');document.body.classList.add('auth-open')}
+function showApp(){$('#auth-screen')?.classList.add('hidden');$('#app')?.classList.remove('hidden');document.body.classList.remove('auth-open')}
+function updateProfileUI(){if(!currentUser)return;const name=currentUser.name||'User',email=currentUser.email||'',init=initials(name);setText('greeting-name',name.split(' ')[0]||name);setText('profile-name',name);setText('profile-email',email);setText('header-initials',init);const av=$('#profile-avatar');if(av)av.textContent=init}
+async function registerUser(name,email,password){const users=loadUsers();const key=email.trim().toLowerCase();if(!key||!key.includes('@'))throw new Error('Enter a valid email address.');if(password.length<6)throw new Error('Password must be at least 6 characters.');if(users[key])throw new Error('An account with this email already exists. Sign in instead.');const salt=uid();const passHash=await hashPassword(password,salt);const user={id:uid(),name:name.trim(),email:key,salt,passHash,created:Date.now()};users[key]=user;saveUsers(users);return user}
+async function loginUser(email,password){const users=loadUsers();const key=email.trim().toLowerCase();const user=users[key];if(!user)throw new Error('No account found for that email. Create an account first.');const passHash=await hashPassword(password,user.salt);if(passHash!==user.passHash)throw new Error('Incorrect password. Try again.');return user}
+function logout(){setSession(null);currentUser=null;tasks=[];habits=[0,0,0,0,0,0,0];dismissedNotifs=[];showAuth()}
+function enterSession(user){currentUser=user;setSession(user);loadUserData();sessionStart=Date.now();showApp();updateProfileUI();if(!appBooted){bootApp();appBooted=true}else{renderAll();updateNotifications();updateGreeting();loadDailyMotivation(false)}}
+function setupAuth(){$$('.auth-tab').forEach(tab=>{tab.addEventListener('click',()=>{$$('.auth-tab').forEach(t=>t.classList.remove('active'));tab.classList.add('active');const mode=tab.dataset.authTab;$('#auth-form-login')?.classList.toggle('hidden',mode!=='login');$('#auth-form-register')?.classList.toggle('hidden',mode!=='register');showAuthError('')})});$('#auth-form-login')?.addEventListener('submit',async e=>{e.preventDefault();showAuthError('');try{enterSession(await loginUser($('#login-email')?.value||'',$('#login-password')?.value||''))}catch(err){showAuthError(err.message||'Sign in failed.')}});$('#auth-form-register')?.addEventListener('submit',async e=>{e.preventDefault();showAuthError('');const password=$('#reg-password')?.value||'';if(password!==($('#reg-password2')?.value||'')){showAuthError('Passwords do not match.');return}try{enterSession(await registerUser($('#reg-name')?.value||'',$('#reg-email')?.value||'',password))}catch(err){showAuthError(err.message||'Could not create account.')}})}
+function formatDue(iso){const today=new Date().toISOString().slice(0,10);const tom=addDays(new Date(),1).toISOString().slice(0,10);if(iso===today)return'Today';if(iso===tom)return'Tomorrow';return new Date(iso+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+function detectLayout(){const isDesktop=window.matchMedia('(min-width:768px)').matches;document.body.classList.toggle('is-desktop',isDesktop);document.body.classList.toggle('is-mobile',!isDesktop)}
+function debounce(fn,ms){let t;return function(){clearTimeout(t);t=setTimeout(fn,ms)}}
+function switchView(view){currentView=view;$$('.view').forEach(v=>v.classList.remove('active'));$$('.nav-item').forEach(n=>n.classList.remove('active'));$$('.side-nav-item').forEach(n=>n.classList.remove('active'));const target=$(`#view-${view}`);if(target)target.classList.add('active');const nav=$(`.nav-item[data-view="${view}"]`);if(nav)nav.classList.add('active');const side=$(`.side-nav-item[data-view="${view}"]`);if(side)side.classList.add('active');closeNotifPanel();if(view==='dashboard')renderDashboard();if(view==='tasks')renderTasks();if(view==='habits')renderHabits();if(view==='ai'){const chat=$('#ai-chat');if(chat)chat.scrollTop=chat.scrollHeight}}
+function setupNavigation(){$$('.nav-item, .side-nav-item').forEach(btn=>btn.addEventListener('click',()=>{const view=btn.dataset.view;if(view)switchView(view)}));$$('[data-nav]').forEach(btn=>btn.addEventListener('click',()=>switchView(btn.dataset.nav)));$('#ask-ai-btn')?.addEventListener('click',()=>switchView('ai'));$('#profile-btn')?.addEventListener('click',()=>switchView('profile'))}
+function updateGreeting(){const now=new Date(),h=now.getHours();let g='Good evening';if(h<12)g='Good morning';else if(h<17)g='Good afternoon';setText('greeting-time',g);const dateEl=$('#current-date');if(dateEl)dateEl.textContent=now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}
+function renderAll(){renderDashboard();renderTasks();renderHabits();updateNotifications()}
+function buildNotifications(){const todayStr=new Date().toISOString().slice(0,10);const items=[];tasks.forEach(t=>{if(t.completed)return;if(t.due&&t.due<todayStr)items.push({id:'overdue-'+t.id,taskId:t.id,type:'overdue',title:t.title,msg:'Overdue — was due '+formatDue(t.due),time:'Due'});else if(t.due===todayStr)items.push({id:'due-'+t.id,taskId:t.id,type:'due',title:t.title,msg:'Due today · '+t.priority+' priority',time:'Today'});else if(t.priority==='critical'||t.priority==='high')items.push({id:'prio-'+t.id,taskId:t.id,type:'priority',title:t.title,msg:t.priority+' priority · '+(t.category||''),time:t.due?formatDue(t.due):'Open'})});const order={overdue:0,due:1,priority:2};items.sort((a,b)=>(order[a.type]||9)-(order[b.type]||9));const seen=new Set(),unique=[];for(const n of items){if(seen.has(n.taskId))continue;seen.add(n.taskId);if(!dismissedNotifs.includes(n.id))unique.push(n)}return unique}
+function updateNotifications(){const list=buildNotifications();const badge=$('#notif-badge'),listEl=$('#notif-list'),emptyEl=$('#notif-empty');if(badge){if(list.length>0){badge.textContent=list.length>9?'9+':String(list.length);badge.classList.remove('hidden')}else badge.classList.add('hidden')}if(!listEl)return;if(list.length===0){listEl.innerHTML='';emptyEl?.classList.remove('hidden');return}emptyEl?.classList.add('hidden');const iconMap={overdue:'fa-exclamation-circle',due:'fa-clock',priority:'fa-flag',info:'fa-info-circle'};listEl.innerHTML=list.map(n=>`<button type="button" class="notif-item unread" data-notif-id="${n.id}" data-task-id="${n.taskId}"><div class="notif-icon ${n.type}"><i class="fas ${iconMap[n.type]||iconMap.info}"></i></div><div class="notif-body"><div class="notif-title">${escapeHtml(n.title)}</div><div class="notif-msg">${escapeHtml(n.msg)}</div></div><span class="notif-time">${escapeHtml(n.time)}</span></button>`).join('')}
+function setupNotifications(){const btn=$('#notif-btn'),panel=$('#notif-panel');btn?.addEventListener('click',e=>{e.stopPropagation();const open=panel?.classList.toggle('open');btn.setAttribute('aria-expanded',open?'true':'false');if(open)updateNotifications()});$('#notif-clear')?.addEventListener('click',e=>{e.stopPropagation();buildNotifications().forEach(n=>{if(!dismissedNotifs.includes(n.id))dismissedNotifs.push(n.id)});persist();updateNotifications();closeNotifPanel()});$('#notif-list')?.addEventListener('click',e=>{const item=e.target.closest('.notif-item');if(!item)return;const notifId=item.dataset.notifId;if(notifId&&!dismissedNotifs.includes(notifId)){dismissedNotifs.push(notifId);persist()}closeNotifPanel();switchView('tasks');updateNotifications()});document.addEventListener('click',e=>{if(!e.target.closest('.notif-wrap'))closeNotifPanel()});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeNotifPanel()})}
+function closeNotifPanel(){$('#notif-panel')?.classList.remove('open');$('#notif-btn')?.setAttribute('aria-expanded','false')}
+function renderDashboard(){const active=tasks.filter(t=>!t.completed),done=tasks.filter(t=>t.completed),total=tasks.length,rate=total?Math.round((done.length/total)*100):0,streak=habits.filter(Boolean).length;setText('kpi-focus',active.length);setText('kpi-done',done.length);setText('kpi-rate',rate+'%');setText('kpi-streak',streak);const todayStr=new Date().toISOString().slice(0,10);const todayTasks=tasks.filter(t=>t.due===todayStr);const todayDone=todayTasks.filter(t=>t.completed).length;const pct=todayTasks.length?Math.round((todayDone/todayTasks.length)*100):0;setText('ring-pct',pct+'%');setText('progress-meta',`${todayDone} of ${todayTasks.length}`);const ring=$('#progress-ring');if(ring){const circ=2*Math.PI*52;ring.style.strokeDasharray=circ;ring.style.strokeDashoffset=circ-(pct/100)*circ}const priority=active.filter(t=>t.priority==='critical'||t.priority==='high').slice(0,4);const list=$('#priority-list');if(list){if(!priority.length)list.innerHTML='<div class="empty-mini">No high-priority items yet. Add a task to get started.</div>';else list.innerHTML=priority.map(t=>`<div class="priority-item" data-id="${t.id}"><span class="prio-dot ${t.priority}"></span><span class="priority-title">${escapeHtml(t.title)}</span><span class="priority-cat">${escapeHtml(t.category)}</span></div>`).join('')}generateInsight();renderHabitStrip()}
+function generateInsight(){const el=$('#ai-insight-text');if(!el)return;const active=tasks.filter(t=>!t.completed);const critical=active.filter(t=>t.priority==='critical');const dueToday=active.filter(t=>t.due===new Date().toISOString().slice(0,10));let text='';if(critical.length)text=`You have ${critical.length} critical item(s). Lead with "${critical[0].title}".`;else if(dueToday.length)text=`${dueToday.length} task(s) due today. Sequence by priority.`;else if(active.length)text=`${active.length} open task(s). Keep steady progress.`;else text='Your board is empty. Add your first task to begin.';el.textContent=text}
+function renderHabitStrip(){const strip=$('#habit-strip');if(!strip)return;const todayIdx=(new Date().getDay()+6)%7;strip.innerHTML=DAYS.map((d,i)=>`<div class="habit-day-mini ${habits[i]?'active':''} ${i===todayIdx?'today':''}">${d}</div>`).join('')}
+function renderTasks(){const list=$('#task-list');if(!list)return;let filtered=[...tasks];if(currentFilter==='active')filtered=filtered.filter(t=>!t.completed);else if(currentFilter==='completed')filtered=filtered.filter(t=>t.completed);else if(currentFilter==='priority')filtered=filtered.filter(t=>!t.completed&&(t.priority==='high'||t.priority==='critical'));const pW={critical:0,high:1,medium:2,low:3};filtered.sort((a,b)=>a.completed!==b.completed?(a.completed?1:-1):(pW[a.priority]||9)-(pW[b.priority]||9));if(!filtered.length){list.innerHTML='<div class="empty-state"><i class="fas fa-clipboard-check"></i><p>No tasks yet. Tap + to add your first one.</p></div>';return}const todayStr=new Date().toISOString().slice(0,10);list.innerHTML=filtered.map(t=>{const overdue=t.due&&t.due<todayStr&&!t.completed;return`<div class="task-item ${t.completed?'completed':''}" data-id="${t.id}"><input type="checkbox" class="task-check" ${t.completed?'checked':''} data-action="toggle"><div class="task-body"><div class="task-title">${escapeHtml(t.title)}</div><div class="task-meta"><span class="task-tag ${t.category}">${escapeHtml(t.category)}</span><span class="task-tag">${escapeHtml(t.priority)}</span>${t.due?`<span class="task-due ${overdue?'overdue':''}"><i class="far fa-calendar"></i> ${formatDue(t.due)}</span>`:''}</div></div><div class="task-actions"><button class="task-action" data-action="edit" aria-label="Edit"><i class="fas fa-pen"></i></button><button class="task-action" data-action="delete" aria-label="Delete"><i class="fas fa-trash-alt"></i></button></div></div>`}).join('')}
+function renderHabits(){const grid=$('#habit-grid');if(!grid)return;const todayIdx=(new Date().getDay()+6)%7,done=habits.filter(Boolean).length;grid.innerHTML=DAYS.map((d,i)=>`<div class="habit-day ${habits[i]?'active':''} ${i===todayIdx?'today':''} ${i>todayIdx?'future':''}" data-idx="${i}">${d}</div>`).join('');setText('habit-week-meta',`${done}/7`);const fill=$('#consistency-fill'),label=$('#consistency-label'),pct=Math.round((done/7)*100);if(fill)fill.style.width=pct+'%';if(label)label.textContent=`${pct}% this week`}
+function openModal(task=null){editingId=task?task.id:null;$('#modal-title').textContent=task?'Edit Task':'New Task';$('#task-title').value=task?task.title:'';$('#task-category').value=task?task.category:'work';$('#task-priority').value=task?task.priority:'medium';$('#task-due').value=task?task.due||'':'';$('#task-modal').classList.add('open');setTimeout(()=>$('#task-title')?.focus(),100)}
+function closeModal(){$('#task-modal')?.classList.remove('open');editingId=null}
+function saveTask(e){e.preventDefault();const title=$('#task-title').value.trim();if(!title)return;const data={title,category:$('#task-category').value,priority:$('#task-priority').value,due:$('#task-due').value||null};if(editingId){const idx=tasks.findIndex(t=>t.id===editingId);if(idx!==-1)tasks[idx]={...tasks[idx],...data}}else tasks.unshift({id:uid(),...data,completed:false,created:Date.now()});persist();closeModal();renderAll()}
+function handleAI(prompt){const chat=$('#ai-chat');if(!chat)return;appendMessage('user',prompt);const thinking=document.createElement('div');thinking.className='ai-message system';thinking.innerHTML='<div class="ai-avatar"><i class="fas fa-brain"></i></div><div class="ai-bubble"><p>Analyzing…</p></div>';chat.appendChild(thinking);chat.scrollTop=chat.scrollHeight;setTimeout(()=>{thinking.remove();appendMessage('system',generateAIResponse(prompt))},450)}
+function appendMessage(role,text){const chat=$('#ai-chat');if(!chat)return;const div=document.createElement('div');div.className=`ai-message ${role==='user'?'user':'system'}`;div.innerHTML=`<div class="ai-avatar"><i class="fas ${role==='user'?'fa-user':'fa-brain'}"></i></div><div class="ai-bubble">${text}</div>`;chat.appendChild(div);chat.scrollTop=chat.scrollHeight}
+function generateAIResponse(prompt){const p=prompt.toLowerCase().trim();const active=tasks.filter(t=>!t.completed),done=tasks.filter(t=>t.completed),critical=active.filter(t=>t.priority==='critical'),dueToday=active.filter(t=>t.due===new Date().toISOString().slice(0,10)),rate=tasks.length?Math.round((done.length/tasks.length)*100):0;if(/driv|walk|rid(e|ing)|game|gaming|video|screen time|health|safety|distract/i.test(p)){const topic=/driv/i.test(p)?'driving':/walk/i.test(p)?'walking':/rid/i.test(p)?'riding':/game|gaming/i.test(p)?'gaming':/video/i.test(p)?'video':'general';return`<p><strong>Health & safety guide</strong></p><p>${SAFETY_MESSAGES[topic]}</p>`}if(/focus|priorit|today|what should/i.test(p)){if(critical.length)return`<p><strong>Focus:</strong> ${escapeHtml(critical[0].title)}</p>`;if(dueToday.length)return`<p>Due today:</p><ul>${dueToday.map(t=>`<li>${escapeHtml(t.title)}</li>`).join('')}</ul>`;if(active.length)return`<p>Top items:</p><ul>${active.slice(0,3).map(t=>`<li>${escapeHtml(t.title)}</li>`).join('')}</ul>`;return'<p>Your list is empty. Add a task first.</p>'}if(/summar|progress|status/i.test(p))return`<p><strong>Snapshot</strong></p><ul><li>Open: ${active.length}</li><li>Done: ${done.length}</li><li>Hit rate: ${rate}%</li></ul>`;if(/add |create |new task|remind/i.test(p)){const match=p.replace(/^(add|create|new task|remind me to|remind)\s+/i,'').trim();if(match.length>2){const title=match.charAt(0).toUpperCase()+match.slice(1);tasks.unshift({id:uid(),title,category:'work',priority:'medium',due:null,completed:false,created:Date.now()});persist();renderAll();return`<p>Captured: <strong>${escapeHtml(title)}</strong></p>`}return'<p>Tell me the task title to capture.</p>'}return'<p>I can help with tasks, focus, progress, or health & safety tips.</p>'}
+function speakGuide(text){try{if(!('speechSynthesis' in window))return;const u=new SpeechSynthesisUtterance(text);u.rate=.95;window.speechSynthesis.cancel();window.speechSynthesis.speak(u)}catch(e){}}
+async function notifyGuide(title,text,tag){try{if(!('Notification' in window))return;if(Notification.permission==='default')await Notification.requestPermission();if(Notification.permission==='granted')new Notification(title||'Apex Health & Safety',{body:text,tag:tag||'apex-guide'})}catch(e){}}
+function showGuideInsight(text){const insight=document.getElementById('ai-insight-text');if(insight)insight.textContent=text;const safetyEl=document.getElementById('safety-guide-text');if(safetyEl)safetyEl.textContent=text}
+function fireGuide(title,msg,tag){if(!currentUser)return;showGuideInsight(msg);notifyGuide(title,msg,tag);speakGuide(msg)}
+function wellbeingKey(slot){return new Date().toISOString().slice(0,10)+'-'+slot.h+':'+slot.m}
+function checkWellbeingSlots(){if(!wellbeingEnabled||!currentUser)return;const now=new Date(),mins=now.getHours()*60+now.getMinutes();for(const slot of WELLBEING_SLOTS){const slotMins=slot.h*60+slot.m;if(mins>=slotMins&&mins<slotMins+5){const key=wellbeingKey(slot);if(key===lastWellbeingKey)return;lastWellbeingKey=key;localStorage.setItem(storageKey('wellbeing_key'),key);fireGuide('Apex Wellbeing',slot.msg,'apex-wellbeing-slot');return}}}
+function checkSessionHealth(){if(!wellbeingEnabled||!currentUser||document.hidden)return;const elapsedMin=Math.floor((Date.now()-sessionStart)/60000);const day=new Date().toISOString().slice(0,10);for(const alert of SESSION_ALERTS){if(elapsedMin>=alert.mins){const alertKey=day+'-'+alert.key;if(sessionAlerted[alertKey])continue;sessionAlerted[alertKey]=true;localStorage.setItem(storageKey('session_alerts'),JSON.stringify(sessionAlerted));fireGuide('Screen time care',alert.msg,'apex-session-'+alert.key);break}}}
+function onVisibilityChange(){if(!document.hidden){const gap=Date.now()-(window._apexLastHidden||Date.now());if(gap>15*60*1000)sessionStart=Date.now()}window._apexLastHidden=Date.now()}
+function guideTopic(topic){fireGuide('Health & safety guide',SAFETY_MESSAGES[topic]||SAFETY_MESSAGES.general,'apex-guide-'+topic)}
+function setupWellbeing(){checkWellbeingSlots();checkSessionHealth();setInterval(()=>{checkWellbeingSlots();checkSessionHealth()},60000);document.addEventListener('visibilitychange',onVisibilityChange);if('Notification' in window&&Notification.permission==='default')Notification.requestPermission().catch(()=>{});document.querySelectorAll('[data-safety-topic]').forEach(btn=>btn.addEventListener('click',()=>guideTopic(btn.dataset.safetyTopic)))}
+function daySeed(){return new Date().toISOString().slice(0,10)}
+function pickFallback(forceRandom){if(forceRandom)return FALLBACK_QUOTES[Math.floor(Math.random()*FALLBACK_QUOTES.length)];const seed=daySeed().split('-').join('');return FALLBACK_QUOTES[parseInt(seed,10)%FALLBACK_QUOTES.length]}
+function renderMotivation(quote,author,source){const qEl=document.getElementById('motivation-quote');const aEl=document.getElementById('motivation-author');const sEl=document.getElementById('motivation-source');if(qEl)qEl.textContent=quote?'“'+quote+'”':'Stay focused. One clear priority at a time.';if(aEl)aEl.textContent=author?'— '+author:'';if(sEl)sEl.textContent=source||''}
+async function fetchFromZenQuotes(path){const res=await fetch('https://zenquotes.io/api/'+path,{cache:'no-store'});if(!res.ok)throw new Error('zenquotes '+res.status);const data=await res.json();const item=Array.isArray(data)?data[0]:data;if(!item||!item.q)throw new Error('bad zenquotes');return{q:item.q,a:item.a||'Unknown',source:'ZenQuotes'}}
+async function fetchFromDummyJSON(){const res=await fetch('https://dummyjson.com/quotes/random',{cache:'no-store'});if(!res.ok)throw new Error('dummyjson '+res.status);const data=await res.json();if(!data||!data.quote)throw new Error('bad dummyjson');return{q:data.quote,a:data.author||'Unknown',source:'DummyJSON'}}
+async function loadDailyMotivation(forceRefresh){const cacheKey='apex_motivation_'+daySeed();if(!forceRefresh){try{const cached=JSON.parse(localStorage.getItem(cacheKey)||'null');if(cached&&cached.q){renderMotivation(cached.q,cached.a,cached.source||'Cached today');return}}catch(e){}}renderMotivation('Loading today’s inspiration…','','');try{let result;if(forceRefresh){try{result=await fetchFromZenQuotes('random')}catch(e1){result=await fetchFromDummyJSON()}}else{try{result=await fetchFromZenQuotes('today')}catch(e1){try{result=await fetchFromDummyJSON()}catch(e2){const fb=pickFallback(false);result={q:fb.q,a:fb.a,source:'Offline'}}}}renderMotivation(result.q,result.a,result.source);try{localStorage.setItem(cacheKey,JSON.stringify({q:result.q,a:result.a,source:result.source}))}catch(e){}}catch(err){const fb=pickFallback(!!forceRefresh);renderMotivation(fb.q,fb.a,'Offline')}}
+function setupMotivation(){loadDailyMotivation(false);document.getElementById('motivation-refresh')?.addEventListener('click',()=>loadDailyMotivation(true))}
+function setupEventListeners(){$$('#task-filters .pill').forEach(pill=>pill.addEventListener('click',()=>{$$('#task-filters .pill').forEach(p=>p.classList.remove('active'));pill.classList.add('active');currentFilter=pill.dataset.filter;renderTasks()}));$('#task-list')?.addEventListener('click',e=>{const item=e.target.closest('.task-item');if(!item)return;const id=item.dataset.id,action=e.target.closest('[data-action]')?.dataset.action;if(action==='toggle'||e.target.classList.contains('task-check')){const t=tasks.find(x=>x.id===id);if(t){t.completed=!t.completed;persist();renderAll()}}else if(action==='edit'){const t=tasks.find(x=>x.id===id);if(t)openModal(t)}else if(action==='delete'){if(confirm('Remove this task?')){tasks=tasks.filter(x=>x.id!==id);persist();renderAll()}}});$('#priority-list')?.addEventListener('click',e=>{if(e.target.closest('.priority-item'))switchView('tasks')});$('#habit-grid')?.addEventListener('click',e=>{const day=e.target.closest('.habit-day');if(!day||day.classList.contains('future'))return;const idx=+day.dataset.idx;habits[idx]=habits[idx]?0:1;persist();renderHabits();renderDashboard()});$('#add-task-fab')?.addEventListener('click',()=>openModal());$('#modal-close')?.addEventListener('click',closeModal);$('#modal-cancel')?.addEventListener('click',closeModal);$('#task-form')?.addEventListener('submit',saveTask);$('#task-modal')?.addEventListener('click',e=>{if(e.target===$('#task-modal'))closeModal()});$('#ai-form')?.addEventListener('submit',e=>{e.preventDefault();const input=$('#ai-input'),val=input.value.trim();if(!val)return;input.value='';handleAI(val)});$$('.suggestion-chip').forEach(chip=>{if(chip.dataset.prompt)chip.addEventListener('click',()=>handleAI(chip.dataset.prompt))});$('#theme-toggle-btn')?.addEventListener('click',()=>{document.body.classList.toggle('light-mode');const isLight=document.body.classList.contains('light-mode');setText('theme-label',isLight?'Light':'Dark')});$('#clear-data-btn')?.addEventListener('click',()=>{if(!confirm('Clear all your tasks and habits on this account?'))return;tasks=[];habits=[0,0,0,0,0,0,0];dismissedNotifs=[];persist();renderAll()});$('#logout-btn')?.addEventListener('click',()=>{if(confirm('Sign out of Apex?'))logout()})}
+function bootApp(){setupNavigation();setupEventListeners();setupNotifications();updateGreeting();renderAll();updateNotifications();detectLayout();window.addEventListener('resize',debounce(detectLayout,150));setupWellbeing();setupMotivation()}
+function init(){try{localStorage.removeItem('apex_tasks');localStorage.removeItem('apex_habits');localStorage.removeItem('apex_dismissed_notifs')}catch(e){}setupAuth();const session=getSession();if(session&&session.email){const users=loadUsers();const user=users[session.email];if(user&&user.id===session.id){enterSession(user);return}}showAuth()}
+document.addEventListener('DOMContentLoaded',init);
 })();
