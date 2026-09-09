@@ -1,33 +1,31 @@
 # Apex — Tasks + Health & Safety Guide
 
-Executive task manager with **personal accounts**, empty boards, and health/safety guidance.
+Personal accounts, empty boards, health guidance, and **daily motivation** from live quote APIs.
+
+## Daily Motivation
+
+Dashboard loads today’s quote from:
+
+1. [ZenQuotes](https://zenquotes.io/) `/api/today` (primary)
+2. [DummyJSON](https://dummyjson.com/) `/quotes/random` (fallback)
+3. Offline built-in quotes if the network fails
+
+Quotes are cached once per day. **Refresh** fetches a new random quote.
 
 ## Accounts
 
-- **Create account** / **Sign in** with email and password
-- Each user has a **private** task list, habits, and notifications on this device
-- New accounts start with **zero tasks** (no demo data)
-- Sign out from **Profile**
-
-Accounts are stored in the browser on this device (not a central server). For cloud accounts across devices, a backend would be required.
+- Create account / Sign in (email + password, hashed on-device)
+- Private tasks per user — **no sample tasks**
+- Sign out from Profile
 
 ## Hosting
 
-Static site — no build step.
+Static site. Enable GitHub Pages: **Settings → Pages → master / root**
 
-### GitHub Pages
-
-1. **Settings → Pages**
-2. Branch: **master** / folder: **/ (root)**
-3. Live at: `https://joelsogo.github.io/Task-manager/`
+`https://joelsogo.github.io/Task-manager/`
 
 ```bash
 npx serve .
 ```
 
-## Features
-
-- Multi-user sign in / register
-- Tasks, dashboard, habits, Apex AI
-- Health & safety guide (driving, walking, riding, gaming, videos)
-- Session and daily wellbeing reminders
+Vanilla JS is enough for auth, tasks, and the motivation API. No build step required.
